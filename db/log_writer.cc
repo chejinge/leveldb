@@ -32,14 +32,15 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 Writer::~Writer() = default;
 
 Status Writer::AddRecord(const Slice& slice) {
-  const char* ptr = slice.data();
-  size_t left = slice.size();
+  const char* ptr = slice.data();//数据
+  size_t left = slice.size();//长度
 
   // Fragment the record if necessary and emit it.  Note that if slice
   // is empty, we still want to iterate once to emit a single
   // zero-length record
   Status s;
   bool begin = true;
+  //进入do while循环中，直到写入出错，或者成功写入全部数据，如下：
   do {
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
@@ -48,6 +49,7 @@ Status Writer::AddRecord(const Slice& slice) {
       if (leftover > 0) {
         // Fill the trailer (literal below relies on kHeaderSize being 7)
         static_assert(kHeaderSize == 7, "");
+        //首先查看当前block是否<7，如果<7则补位，并重置block偏移
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
       block_offset_ = 0;
@@ -55,7 +57,7 @@ Status Writer::AddRecord(const Slice& slice) {
 
     // Invariant: we never leave < kHeaderSize bytes in a block.
     assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
-
+    //计算block剩余大小，以及本次log record可写入数据长度
     const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
     const size_t fragment_length = (left < avail) ? left : avail;
 

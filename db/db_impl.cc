@@ -44,8 +44,8 @@ struct DBImpl::Writer {
   explicit Writer(port::Mutex* mu)
       : batch(nullptr), sync(false), done(false), cv(mu) {}
 
-  Status status;
-  WriteBatch* batch;
+  Status status;//存储写入的状态
+  WriteBatch* batch;//指向要写入的数据
   bool sync;
   bool done;
   port::CondVar cv;
@@ -1114,19 +1114,25 @@ int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value) {
+  // Status是leveldb自己定义的用来做各种状态返回的
+  // ReadOptions提供一些读取参数，目前可忽略
+  // key是要查找的key，而value是指针，用来保存查找到的值
   Status s;
-  MutexLock l(&mutex_);
-  SequenceNumber snapshot;
-  if (options.snapshot != nullptr) {
+  MutexLock l(&mutex_);// 加锁
+  SequenceNumber snapshot;// snapshot版本号,可以读取指定版本的数据,否则读取最新版本的数据.
+  //读取的时候数据也是会插入的,假如Get请求先到来,而Put后插入一条数据,这时候新数据并不会被读取到
+  if (options.snapshot != nullptr) {//snatshop判空赋值，将LastSequence版本号赋值给snapshot
     snapshot =
         static_cast<const SnapshotImpl*>(options.snapshot)->sequence_number();
   } else {
     snapshot = versions_->LastSequence();
   }
-
+  //分别获取到memtable和Imuable memtable的指针
   MemTable* mem = mem_;
   MemTable* imm = imm_;
+  // 获取当前版本号
   Version* current = versions_->current();
+  // 增加reference计数,防止在读取的时候并发线程释放掉memtable的数据
   mem->Ref();
   if (imm != nullptr) imm->Ref();
   current->Ref();
@@ -1134,10 +1140,11 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   bool have_stat_update = false;
   Version::GetStats stats;
 
-  // Unlock while reading from files and memtables
+  // 当从文件或者memtable读取的时候进行解锁
   {
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
+    // LookupKey是由key和版本号的封装.用来查找,不然每次都要传两个参数.把高耦合的参数合并成一个数据结构!
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // Done

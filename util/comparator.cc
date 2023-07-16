@@ -31,16 +31,19 @@ class BytewiseComparatorImpl : public Comparator {
   void FindShortestSeparator(std::string* start,
                              const Slice& limit) const override {
     // Find length of common prefix
+    // 首先计算共同前缀的字符串长度
     size_t min_length = std::min(start->size(), limit.size());
     size_t diff_index = 0;
     while ((diff_index < min_length) &&
            ((*start)[diff_index] == limit[diff_index])) {
       diff_index++;
     }
-
     if (diff_index >= min_length) {
       // Do not shorten if one string is a prefix of the other
+      //说明*start是limit的前缀，或者反之，此时不作修改，直接返回
     } else {
+      // 尝试执行字符start[diff_index]++，设置start长度为diff_index+1，并返回
+          // ++条件：字符< oxff 并且字符+1 < limit上该index的字符
       uint8_t diff_byte = static_cast<uint8_t>((*start)[diff_index]);
       if (diff_byte < static_cast<uint8_t>(0xff) &&
           diff_byte + 1 < static_cast<uint8_t>(limit[diff_index])) {
@@ -53,9 +56,11 @@ class BytewiseComparatorImpl : public Comparator {
 
   void FindShortSuccessor(std::string* key) const override {
     // Find first character that can be incremented
+    // 找到第一个可以++的字符，执行++后，截断字符串
     size_t n = key->size();
     for (size_t i = 0; i < n; i++) {
       const uint8_t byte = (*key)[i];
+      // 如果找不到说明*key的字符都是0xff啊，那就不作修改，直接返回
       if (byte != static_cast<uint8_t>(0xff)) {
         (*key)[i] = byte + 1;
         key->resize(i + 1);

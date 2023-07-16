@@ -217,6 +217,7 @@ LRUCache::~LRUCache() {
 
 void LRUCache::Ref(LRUHandle* e) {
   if (e->refs == 1 && e->in_cache) {  // If on lru_ list, move to in_use_ list.
+    // 如果 refs == 1 且缓存项在 LRUCache 中，说明缓存项在闲置链表 lru_中，将它放到 in_use_ 链表。
     LRU_Remove(e);
     LRU_Append(&in_use_, e);
   }
@@ -254,7 +255,7 @@ Cache::Handle* LRUCache::Lookup(const Slice& key, uint32_t hash) {
   MutexLock l(&mutex_);
   LRUHandle* e = table_.Lookup(key, hash);
   if (e != nullptr) {
-    Ref(e);
+    Ref(e);//增加引用计数器
   }
   return reinterpret_cast<Cache::Handle*>(e);
 }

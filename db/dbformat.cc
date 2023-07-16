@@ -49,10 +49,13 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   //    increasing user key (according to user-supplied comparator)
   //    decreasing sequence number
   //    decreasing type (though sequence# should be enough to disambiguate)
+  // 首先比较user key，基于用户设置的comparator，如果user key不相等就直接返回比较,否则执行进入S2
   int r = user_comparator_->Compare(ExtractUserKey(akey), ExtractUserKey(bkey));
   if (r == 0) {
     const uint64_t anum = DecodeFixed64(akey.data() + akey.size() - 8);
     const uint64_t bnum = DecodeFixed64(bkey.data() + bkey.size() - 8);
+    //取出8字节的sequence number | value type，
+    // 如果akey的 > bkey的则返回**-1**，如果akey的**<bkey的返回1**，相等返回0
     if (anum > bnum) {
       r = -1;
     } else if (anum < bnum) {
@@ -65,14 +68,19 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
 void InternalKeyComparator::FindShortestSeparator(std::string* start,
                                                   const Slice& limit) const {
   // Attempt to shorten the user portion of the key
+  // 尝试更新user key，基于指定的user comparator
   Slice user_start = ExtractUserKey(*start);
   Slice user_limit = ExtractUserKey(limit);
   std::string tmp(user_start.data(), user_start.size());
   user_comparator_->FindShortestSeparator(&tmp, user_limit);
+  //判断*start是否小于limit
+  //在[start,limit)中找到一个短字符串，并返回给*start
   if (tmp.size() < user_start.size() &&
       user_comparator_->Compare(user_start, tmp) < 0) {
     // User key has become shorter physically, but larger logically.
     // Tack on the earliest possible number to the shortened user key.
+    // user key在物理上长度变短了，但其逻辑值变大了.生产新的*start时，
+            // 使用最大的sequence number，以保证排在相同user key记录序列的第一个
     PutFixed64(&tmp,
                PackSequenceAndType(kMaxSequenceNumber, kValueTypeForSeek));
     assert(this->Compare(*start, tmp) < 0);
@@ -83,12 +91,17 @@ void InternalKeyComparator::FindShortestSeparator(std::string* start,
 
 void InternalKeyComparator::FindShortSuccessor(std::string* key) const {
   Slice user_key = ExtractUserKey(*key);
+  //尝试更新user_key,基于指定的user comparator
   std::string tmp(user_key.data(), user_key.size());
   user_comparator_->FindShortSuccessor(&tmp);
+  //找一个>= *key的短字符串
+  //简单的comparator实现可能不改变*key
   if (tmp.size() < user_key.size() &&
       user_comparator_->Compare(user_key, tmp) < 0) {
     // User key has become shorter physically, but larger logically.
     // Tack on the earliest possible number to the shortened user key.
+    // user key在物理上长度变短了，但其逻辑值变大了.生产新的*start时，
+    // 使用最大的sequence number，以保证排在相同user key记录序列的第一个
     PutFixed64(&tmp,
                PackSequenceAndType(kMaxSequenceNumber, kValueTypeForSeek));
     assert(this->Compare(*key, tmp) < 0);
