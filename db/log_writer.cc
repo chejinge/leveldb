@@ -60,7 +60,7 @@ Status Writer::AddRecord(const Slice& slice) {
     //计算block剩余大小，以及本次log record可写入数据长度
     const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
     const size_t fragment_length = (left < avail) ? left : avail;
-
+    //根据两个值，判断log type
     RecordType type;
     const bool end = (left == fragment_length);
     if (begin && end) {
@@ -72,7 +72,7 @@ Status Writer::AddRecord(const Slice& slice) {
     } else {
       type = kMiddleType;
     }
-
+    //调用EmitPhysicalRecord函数，append日志；并更新指针、剩余长度和begin标记
     s = EmitPhysicalRecord(type, ptr, fragment_length);
     ptr += fragment_length;
     left -= fragment_length;
@@ -86,26 +86,26 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   assert(length <= 0xffff);  // Must fit in two bytes
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
-  // Format the header
+  // Format the header 计算header
   char buf[kHeaderSize];
   buf[4] = static_cast<char>(length & 0xff);
   buf[5] = static_cast<char>(length >> 8);
-  buf[6] = static_cast<char>(t);
+  buf[6] = static_cast<char>(t);// 计算record type和payload的CRC校验值
 
   // Compute the crc of the record type and the payload.
   uint32_t crc = crc32c::Extend(type_crc_[t], ptr, length);
-  crc = crc32c::Mask(crc);  // Adjust for storage
+  crc = crc32c::Mask(crc);  // Adjust for storage// 空间调整
   EncodeFixed32(buf, crc);
-
+   //将header append到log文件
   // Write the header and the payload
   Status s = dest_->Append(Slice(buf, kHeaderSize));
   if (s.ok()) {
-    s = dest_->Append(Slice(ptr, length));
+    s = dest_->Append(Slice(ptr, length));//写入payload
     if (s.ok()) {
-      s = dest_->Flush();
+      s = dest_->Flush();//并Flush
     }
   }
-  block_offset_ += kHeaderSize + length;
+  block_offset_ += kHeaderSize + length;//更新block的当前偏移
   return s;
 }
 

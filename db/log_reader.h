@@ -20,7 +20,7 @@ namespace log {
 class Reader {
  public:
   // Interface for reporting errors.
-  class Reporter {
+  class Reporter {//汇报错误Reporter
    public:
     virtual ~Reporter();
 
@@ -63,12 +63,11 @@ class Reader {
  private:
   // Extend record types with the following special values
   enum {
-    kEof = kMaxRecordType + 1,
-    // Returned whenever we find an invalid physical record.
-    // Currently there are three situations in which this happens:
-    // * The record has an invalid CRC (ReadPhysicalRecord reports a drop)
-    // * The record is a 0-length record (No drop is reported)
-    // * The record is below constructor's initial_offset (No drop is reported)
+    kEof = kMaxRecordType + 1,//遇到文件结尾
+    // 非法的record，当前有3中情况会返回bad record：
+    // * CRC校验失败 (ReadPhysicalRecord reports adrop)
+    // * 长度为0 (No drop is reported)
+    // * 在指定的initial_offset之外 (No drop is reported)
     kBadRecord = kMaxRecordType + 2
   };
 
@@ -89,16 +88,18 @@ class Reader {
   Reporter* const reporter_;
   bool const checksum_;
   char* const backing_store_;
-  Slice buffer_;
+  Slice buffer_;// 读取的内容
+  //上次Read()返回长度< kBlockSize，暗示到了文件结尾EOF
   bool eof_;  // Last Read() indicated EOF by returning < kBlockSize
-
   // Offset of the last record returned by ReadRecord.
+  //函数ReadRecord返回的上一个record的偏移
   uint64_t last_record_offset_;
   // Offset of the first location past the end of buffer_.
-  uint64_t end_of_buffer_offset_;
+  //
+  uint64_t end_of_buffer_offset_;// 当前的读取偏移
 
   // Offset at which to start looking for the first record to return
-  uint64_t const initial_offset_;
+  uint64_t const initial_offset_;// 偏移，从哪里开始读取第一条record
 
   // True if we are resynchronizing after a seek (initial_offset_ > 0). In
   // particular, a run of kMiddleType and kLastType records can be silently

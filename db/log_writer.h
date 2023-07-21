@@ -37,6 +37,7 @@ class Writer {
   Status AddRecord(const Slice& slice);
 
  private:
+  //实际写入的地方，涉及到log的存储格式
   Status EmitPhysicalRecord(RecordType type, const char* ptr, size_t length);
 
   WritableFile* dest_;
