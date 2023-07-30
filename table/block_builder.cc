@@ -67,7 +67,7 @@ Slice BlockBuilder::Finish() {
   }
   PutFixed32(&buffer_, restarts_.size());// 确定重启点数量
   finished_ = true;//置finish为true
-  return Slice(buffer_);$
+  return Slice(buffer_);
 }
 
 void BlockBuilder::Add(const Slice& key, const Slice& value) {

@@ -270,7 +270,7 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
                                 void (*deleter)(const Slice& key,
                                                 void* value)) {
   MutexLock l(&mutex_);
-
+  // 构建数据条目句柄
   LRUHandle* e =
       reinterpret_cast<LRUHandle*>(malloc(sizeof(LRUHandle) - 1 + key.size()));
   e->value = value;
@@ -279,19 +279,19 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   e->key_length = key.size();
   e->hash = hash;
   e->in_cache = false;
-  e->refs = 1;  // for the returned handle.
+  e->refs = 1;  // for the returned handle.客户端引用
   std::memcpy(e->key_data, key.data(), key.size());
 
   if (capacity_ > 0) {
-    e->refs++;  // for the cache's reference.
+    e->refs++;  // for the cache's reference.//缓存本身引用
     e->in_cache = true;
     LRU_Append(&in_use_, e);
     usage_ += charge;
-    FinishErase(table_.Insert(e));
-  } else {  // don't cache. (capacity_==0 is supported and turns off caching.)
-    // next is read by key() in an assert, so it must be initialized
-    e->next = nullptr;
+    FinishErase(table_.Insert(e));//如果替换，需要删除掉原来的数据
+  } else { //capcity =0时表示关闭缓存，不进行任何缓存
+    e->next = nullptr;//因为next()会在key()函数中被assert测试，因此要初始化一下
   }
+  //当数据量超出容量时，根据LRU策略将不被客户端引用的数据逐出内存
   while (usage_ > capacity_ && lru_.next != &lru_) {
     LRUHandle* old = lru_.next;
     assert(old->refs == 1);
