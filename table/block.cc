@@ -116,12 +116,12 @@ class Block::Iter : public Iterator {
  public:
   Iter(const Comparator* comparator, const char* data, uint32_t restarts,
        uint32_t num_restarts)
-      : comparator_(comparator),
-        data_(data),
-        restarts_(restarts),
-        num_restarts_(num_restarts),
-        current_(restarts_),
-        restart_index_(num_restarts_) {
+      : comparator_(comparator),// key比较器
+        data_(data),// block内容
+        restarts_(restarts),// 重启点(uint32数组)在data中的偏移
+        num_restarts_(num_restarts),// 重启点个数
+        current_(restarts_),// 当前entry在data中的偏移.  >= restarts_表明非法
+        restart_index_(num_restarts_) { // current_所在的重启点的index
     assert(num_restarts_ > 0);
   }
 

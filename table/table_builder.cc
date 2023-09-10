@@ -146,23 +146,27 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
   assert(ok());
   Rep* r = rep_;
   Slice raw = block->Finish();
-
+  // 获得data block的序列化字符串
   Slice block_contents;
   CompressionType type = r->options.compression;
   // TODO(postrelease): Support more compression options: zlib?
+  // 根据压缩类型压缩
   switch (type) {
     case kNoCompression:
-      block_contents = raw;
+      block_contents = raw;// 不压缩
       break;
 
     case kSnappyCompression: {
+      // snappy压缩格式
       std::string* compressed = &r->compressed_output;
+      //如果压缩后的大小比原始大小的7/8小（压缩率12.5%以上），则压缩，否则写入原始数据
       if (port::Snappy_Compress(raw.data(), raw.size(), compressed) &&
           compressed->size() < raw.size() - (raw.size() / 8u)) {
         block_contents = *compressed;
       } else {
         // Snappy not supported, or compressed less than 12.5%, so just
         // store uncompressed form
+        // 如果不支持Snappy，或者压缩率低于12.5%，依然当作不压缩存储
         block_contents = raw;
         type = kNoCompression;
       }
@@ -184,6 +188,7 @@ void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
       break;
     }
   }
+  //将data内容写入到文件，并重置block成初始化状态，清空compressedoutput
   WriteRawBlock(block_contents, type, handle);
   r->compressed_output.clear();
   block->Reset();
@@ -193,9 +198,11 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
                                  CompressionType type, BlockHandle* handle) {
   Rep* r = rep_;
   handle->set_offset(r->offset);
+  // 为index设置data block的handle信息
   handle->set_size(block_contents.size());
-  r->status = r->file->Append(block_contents);
+  r->status = r->file->Append(block_contents);// 写入data block内容
   if (r->status.ok()) {
+    // 写入1byte的type和4bytes的crc32
     char trailer[kBlockTrailerSize];
     trailer[0] = type;
     uint32_t crc = crc32c::Value(block_contents.data(), block_contents.size());
@@ -203,6 +210,7 @@ void TableBuilder::WriteRawBlock(const Slice& block_contents,
     EncodeFixed32(trailer + 1, crc32c::Mask(crc));
     r->status = r->file->Append(Slice(trailer, kBlockTrailerSize));
     if (r->status.ok()) {
+      // 写入成功更新offset-下一个data block的写入偏移
       r->offset += block_contents.size() + kBlockTrailerSize;
     }
   }
